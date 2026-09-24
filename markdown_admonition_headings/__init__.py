@@ -24,11 +24,8 @@ class HeadingAdmonitionProcessor(AdmonitionProcessor):
        and attaches permalinks.
     """
 
-    # Matches:
-    # !!! type [h1-h6] "Title" [{: [#]custom-slug}]
-    # ???[+] type [h1-h6] "Title" [{: [#]custom-slug}]
     RE = re.compile(
-        r'(?:^|\n)!!! ?([\w\-]+(?: +[\w\-]+)*)(?: +"(.*?)")?(?: +\{:\s*#?([^\s\}]+)\s*\})? *(?:\n|$)'
+        r'(?:^|\n)!!![ \t]*([\w\-]+(?: +[\w\-]+)*)(?: +"(.*?)")?(?: +\{:\s*#?([^\s\}]+)\s*\})? *(?:\n|$)'
     )
 
     def __init__(self, parser, default_heading_level="h2", auto_heading_classes=None):
@@ -38,55 +35,70 @@ class HeadingAdmonitionProcessor(AdmonitionProcessor):
         self.default_heading_level = default_heading_level
         self.auto_heading_classes = auto_heading_classes
 
-    def run(self, parent, blocks):
-        sibling = self.lastChild(parent)
+    def get_admonition_data(self, match: re.Match[str]):
+        klass, raw_title = match.group(1).lower(), match.group(2)
+        klass = self.RE_SPACES.sub(' ', klass)
+        custom_slug = match.group(3)
+
+        if raw_title is None:
+            # no title was provided, use the capitalized class name as title
+            title = klass.split(' ', 1)[0].capitalize()
+        elif raw_title == '':
+            # an explicit blank title should not be rendered
+            title = None
+        else:
+            title = raw_title
+
+        classes = klass.split()
+        tag = next((c for c in classes if c in ("h1", "h2", "h3", "h4", "h5", "h6")), None)
+
+        if tag is None and any(c in self.auto_heading_classes for c in classes):
+            tag = self.default_heading_level
+
+        if tag is None:
+            tag = "p"
+
+        return klass, title, tag, custom_slug
+
+    def run(self, parent: etree.Element, blocks: list[str]) -> None:
         block = blocks.pop(0)
         m = self.RE.search(block)
+
         if m:
-            if block.startswith(' ' * self.tab_length):
-                block = block[m.end():]
-                status = 'sub'
-            elif block.startswith('!!!'):
-                status = 'new'
-                total_class = m.group(1)
-                title = m.group(2)
-                custom_slug = m.group(3)
-                block = block[m.end():]
-            else:
-                status = 'orphan'
+            if m.start() > 0:
+                self.parser.parseBlocks(parent, [block[:m.start()]])
+            block = block[m.end():]  # removes the first line
+            block, theRest = self.detab(block)
         else:
-            status = 'sub'
+            sibling, block, theRest = self.parse_content(parent, block)
 
-        if status == 'new':
-            classes = total_class.split()
-            # Check for explicit h1-h6 in classes
-            tag = next((c for c in classes if c in ("h1", "h2", "h3", "h4", "h5", "h6")), None)
-
-            # If not specified, check if any class matches auto-heading classes
-            if tag is None and any(c in self.auto_heading_classes for c in classes):
-                tag = self.default_heading_level
-
-            if tag is None:
-                tag = "p"
-
-            div = etree.SubElement(parent, "div", attrib={"class": f"admonition {total_class}"})
-            if title is not None:
-                title_attrs = {"class": "admonition-title"}
+        if m:
+            klass, title, tag, custom_slug = self.get_admonition_data(m)
+            div = etree.SubElement(parent, 'div')
+            div.set('class', f"{self.CLASSNAME} {klass}")
+            if title:
+                title_elem = etree.SubElement(div, tag)
+                title_elem.text = title
+                title_elem.set('class', self.CLASSNAME_TITLE)
                 if custom_slug:
-                    title_attrs["id"] = custom_slug
-                h = etree.SubElement(div, tag, attrib=title_attrs)
-                h.text = title
-            elif self.first_as_title:
-                self.first_as_title = False
-                title_attrs = {"class": "admonition-title"}
-                if custom_slug:
-                    title_attrs["id"] = custom_slug
-                h = etree.SubElement(div, tag, attrib=title_attrs)
-                h.text = classes[0].capitalize()
+                    title_elem.set('id', custom_slug)
+        else:
+            # Sibling is a list item, but we need to wrap its content in <p>
+            if sibling.tag in ('li', 'dd') and sibling.text:
+                text = sibling.text
+                sibling.text = ''
+                p = etree.SubElement(sibling, 'p')
+                p.text = text
 
-            self.parser.parseBlocks(div, [block])
-        elif status == 'sub':
-            self.parser.parseBlocks(sibling, [block])
+            div = sibling
+
+        self.parser.parseChunk(div, block)
+
+        if theRest:
+            # This block contained unindented line(s) after the first indented
+            # line. Insert these lines as the first block of the master blocks
+            # list for future processing.
+            blocks.insert(0, theRest)
 
 
 class HeadingAdmonitionExtension(Extension):

@@ -53,6 +53,45 @@ class TestHeadingAdmonitions(unittest.TestCase):
         html = self.md.convert(text)
         self.assertIn('<p class="admonition-title">Standard Note</p>', html)
 
+    def test_admonition_body_not_rendered_as_code_block(self):
+        text = (
+            '!!! ccard "Title"\n'
+            '    This is regular text with **bold**.\n'
+            '\n'
+            '    * Item 1\n'
+            '    * Item 2\n'
+        )
+        html = self.md.convert(text)
+        self.assertNotIn('<pre>', html)
+        self.assertNotIn('<code>', html)
+        self.assertIn('<p>This is regular text with <strong>bold</strong>.</p>', html)
+        self.assertIn('<ul>', html)
+        self.assertIn('<li>Item 1</li>', html)
+
+
+    def test_multi_paragraph_admonition(self):
+        text = (
+            '!!! ccard "Multi Paragraph"\n'
+            '    Paragraph one.\n'
+            '\n'
+            '    Paragraph two.\n'
+        )
+        html = self.md.convert(text)
+        self.assertIn('<p>Paragraph one.</p>', html)
+        self.assertIn('<p>Paragraph two.</p>', html)
+        self.assertNotIn('<pre>', html)
+
+    def test_empty_title_admonition(self):
+        text = '!!! note ""\n    No title content'
+        html = self.md.convert(text)
+        self.assertNotIn('admonition-title', html)
+        self.assertIn('<p>No title content</p>', html)
+
+    def test_unspecified_title_admonition(self):
+        text = '!!! note\n    Default title content'
+        html = self.md.convert(text)
+        self.assertIn('<p class="admonition-title">Note</p>', html)
+
 
 if __name__ == "__main__":
     unittest.main()
