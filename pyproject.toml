@@ -1,0 +1,38 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "markdown-admonition-headings"
+version = "0.1.0"
+description = "A Python-Markdown extension rendering admonition callout titles as true heading tags with TOC hierarchy and custom slugs."
+readme = "README.md"
+license = "MIT"
+authors = [
+    { name = "nyctrance", email = "nyctrance@noreply.github.com" }
+]
+keywords = ["markdown", "python-markdown", "mkdocs", "admonitions", "callouts", "headings", "toc"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Text Processing :: Markup :: Markdown",
+]
+dependencies = [
+    "markdown>=3.2",
+]
+
+[project.urls]
+Homepage = "https://github.com/nyctrance/markdown-admonition-headings"
+Repository = "https://github.com/nyctrance/markdown-admonition-headings.git"
+
+[project.entry-points."markdown.extensions"]
+admonition_headings = "markdown_admonition_headings:HeadingAdmonitionExtension"
+heading_admonition = "markdown_admonition_headings:HeadingAdmonitionExtension"
